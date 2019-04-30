@@ -1,0 +1,65 @@
+USE [statute]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_Paging]    Script Date: 2019/4/19 16:20:23 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[sp_Paging]
+	@Tables  nvarchar(256) ,
+	@Fields nvarchar(1024) = N'*',
+	@OrderBy nvarchar(1024) ,
+	@JoinCondition nvarchar(1024) = null,
+	@StrWhere nvarchar(1024) = null,
+	@pageSize int = 100,
+	@pageIndex int = 1 output,
+	@totalCount int output,
+	@totalPageCount int output
+AS
+BEGIN
+	declare @strSearchSql nvarchar(4000)
+	declare @strCountSql  nvarchar(4000) 
+
+    set @strCountSql = 'select @totalCount = count(*) from '+@Tables + ' ' + @JoinCondition 
+	
+	set @strSearchSql = 'select '+@Fields 
+	   + ',ROW_NUMBER() over (order by '+@OrderBy+') as rownumber'
+	   + ' from '+@Tables + ' ' + @JoinCondition 
+
+	if @StrWhere is not null and @StrWhere <> ''
+		begin
+			set @strSearchSql = @strSearchSql + ' where '+ @StrWhere
+			set @strCountSql = @strCountSql +  ' where '+ @StrWhere
+		end
+		
+	--exec(@strCountSql)
+	EXEC sp_executesql @strCountSql,N'@totalCount int OUTPUT',@totalCount OUTPUT
+
+	--必须将整数转换成小数再相除，并向上取整
+	set @totalPageCount = ceiling(cast(@totalCount as decimal(18,2)) / cast(@pageSize as decimal(18,2)))
+	
+	if @pageIndex < 1  
+	   set @pageIndex = 1
+
+	if @pageSize < 1 or @pageSize > 1000
+		set @pageSize = 100
+    	
+	if @pageIndex > @totalPageCount
+		set @pageIndex = @totalPageCount	
+	
+	declare @startIndex int = 1
+	set @startIndex = @pageSize * (@pageIndex - 1) + 1
+
+
+	set @strSearchSql = 'select * from ('			
+			+ @strSearchSql +') as t_tablename '
+			+ ' where t_tablename.rownumber between '+ CAST(@startIndex as nvarchar(50)) +' and '+ cast((@startIndex + @pageSize - 1) as nvarchar(50))
+    
+	--exec ('select @pageIndex')
+	--exec ('select @totalCount')
+	--exec ('select @totalPageCount')
+	
+	exec(@strSearchSql)
+
+END
