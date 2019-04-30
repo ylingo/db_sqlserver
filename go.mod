@@ -1,4 +1,4 @@
-module db_sqlserver
+module github.com/ylingo/db_sqlserver
 
 go 1.12
 
