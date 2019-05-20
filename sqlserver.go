@@ -4,6 +4,7 @@ import (
 	//"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/jmoiron/sqlx"
@@ -21,17 +22,21 @@ func InitDb(driver string, dsn string, maxopenconns, maxidleconns int, logfile b
 		logTofile = logfile
 		errTofile = errfile
 		//fmt.Printf("%p, %T\n", database, database)
-		database, _ = sqlx.Open(driver, dsn)
-
-		//fmt.Printf("%p, %T\n", database, database)
-		if err := database.Ping(); err != nil {
+		var err error
+		if database, err = sqlx.Open(driver, dsn); err != nil {
 			fmt.Println(err)
-			return
-		}
-		database.SetMaxOpenConns(maxopenconns)
-		database.SetMaxIdleConns(maxidleconns)
+		} else {
 
-		//fmt.Println("数据库打开了")
+			if err := database.Ping(); err != nil {
+				fmt.Println(err)
+				return
+			}
+			database.SetMaxOpenConns(maxopenconns)
+			database.SetMaxIdleConns(maxidleconns)
+			t, _ := time.ParseDuration("30m")
+			database.SetConnMaxLifetime(t)
+			//fmt.Println("数据库打开了")
+		}
 	}
 	once.Do(onceInit)
 }

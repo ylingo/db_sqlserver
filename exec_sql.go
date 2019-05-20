@@ -1,12 +1,5 @@
 package db_sqlserver
 
-import (
-	"fmt"
-)
-
-//"fmt"
-//"github.com/jmoiron/sqlx"
-
 func ExecNoQuery(strStmt string, args ...interface{}) error {
 
 	sqlStmt, err := database.Prepare(strStmt)
@@ -26,26 +19,19 @@ func ExecNoQuery(strStmt string, args ...interface{}) error {
 }
 
 func ExecInsertGetLastId(strStmt string, args ...interface{}) (int64, error) {
-	//fmt.Println(argsToString(args...))
+	strStmt += ";select isnull(SCOPE_IDENTITY(),0)"
 	sqlStmt, err := database.Prepare(strStmt)
-	defer checkerr()
-	defer sqlStmt.Close()
 	if err != nil {
-		errorinfo("ExecInsertGetLastId1,sql:%s,param:%s,err:%s", strStmt, argsToString(args...), err)
 		return 0, err
+	} else {
+		var seqId int64
+		row := sqlStmt.QueryRow(args...)
+		if err = row.Scan(&seqId); err != nil {
+			return 0, err
+		} else {
+			return seqId, nil
+		}
 	}
-	sqlResult, err := sqlStmt.Exec(args...)
-	if err != nil {
-		errorinfo("ExecInsertGetLastId2,sql:%s,param:%s,err:%s", strStmt, argsToString(args...), err)
-		return 0, err
-	}
-	id, err := sqlResult.LastInsertId()
-	if err != nil {
-		errorinfo("ExecInsertGetLastId3,sql:%s,param:%s,err:%s", strStmt, argsToString(args...), err)
-		return 0, err
-	}
-	//loginfo("ExecInsertGetLastId,sql:%s,param:%s", strStmt, "", argsToString(args...))
-	return id, nil
 }
 
 func ExecQuery(dest interface{}, strStmt string, args ...interface{}) error {
@@ -58,24 +44,6 @@ func ExecQuery(dest interface{}, strStmt string, args ...interface{}) error {
 	//loginfo("ExecQuery,sql:%s,param:%s", strStmt, argsToString(args...))
 	return nil
 
-	//方法二
-	//	stmt, err := database.Prepare(strStmt)
-	//	if err != nil {
-	//		errorinfo("ExecQuery,1,sql:%s,param:%s,err:%s", strStmt,  argsToString(args...), err)
-	//		return err
-	//	}
-	//	rows, err := stmt.Query(args...)
-	//	defer rows.Close()
-	//	if err != nil {
-	//		errorinfo("ExecQuery,2,sql:%s,param:%s,err:%s", strStmt, argsToString(args...), err)
-	//		return err
-	//	}
-	//	if err := sqlx.StructScan(rows, dest); err != nil {
-	//		errorinfo("ExecQuery,4,sql:%s,param:%s,err:%s", strStmt, argsToString(args...), err)
-	//		return err
-	//	}
-	//	loginfo("ExecQuery,sql:%s,param:%s", strStmt, argsToString(args...))
-	//	return nil
 }
 
 func ExecCheckExists(strStmt string, args ...interface{}) (bool, error) {
@@ -85,11 +53,12 @@ func ExecCheckExists(strStmt string, args ...interface{}) (bool, error) {
 	var exists int
 
 	stmt, err := database.Prepare(strSql)
+	defer stmt.Close()
 	if err == nil {
 		row := stmt.QueryRow(args...)
 		if err == nil {
 			if err = row.Scan(&exists); err == nil {
-				fmt.Println(exists)
+				//fmt.Println(exists)
 				if exists == 1 {
 					return true, nil
 				}
@@ -98,16 +67,4 @@ func ExecCheckExists(strStmt string, args ...interface{}) (bool, error) {
 	}
 	return false, err
 
-	//	tmp := []checkExistsTmp{}
-	//	if err := ExecQuery(&tmp, strSql, args...); err != nil {
-	//		return false, err
-	//	}
-	//	if len(tmp) == 1 && tmp[0].Exist == 1 {
-	//		return true, nil
-	//	}
-	//	return false, nil
 }
-
-//type checkExistsTmp struct {
-//	Exist int64 `db:"tt"`
-//}

@@ -5,30 +5,16 @@ import (
 	//"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 	//"time"
 )
 
 func Init() {
 
-	InitDb("sqlserver",
-		"sqlserver://sa:111111@(local)/sql2016?database=teamcall&encrypt=disable",
-		100,
-		20, true, true)
-}
-
-type ProcPagingBase struct {
-	RowTotal  int `db:"rowtotal" json:omit`
-	RowNumber int `db:"rownumber" json:"omit"`
-}
-
-type UserInfo struct {
-	ProcPagingBase
-	SeqId       int64   `db:"seqid"`
-	Salary      float32 `db:"salary"`
-	UserId      string  `db:"userid"`
-	UserName    string  `db:"username"`
-	CompanyName string  `db:"companyname"`
+	InitDb("mssql", "sqlserver://sa:111111@(local)?database=statute&encrypt=disable",
+		100, 20, true, true)
+	// InitDb("odbc",
+	// 	"DRIVER={sql server};server=(local);uid=sa;pwd=111111;database=statute;",
+	// 	100, 20, true, true)
 }
 
 func _Test_ExecQueryPaging(t *testing.T) {
@@ -55,120 +41,103 @@ func _Test_ExecQueryPaging(t *testing.T) {
 }
 
 func _Test_ExecNoQuery(t *testing.T) {
-	//Init()
+	Init()
 
-	strSql := fmt.Sprintf(`insert into T_NewBilling_UserAccount(
-		accountId,userId,financeId,fixedFee,baseUnit,exceedRate,
-		updateTime,updateUser) values(
-		'%s','%s','%s',%f,%d,%f,getdate(),'%s')`,
-		"accountId_test", "userId_test", "financeId",
-		123.4, 666, 0.1234, "yanglin_test")
+	strSql := "insert into tbl_test(c1,c2,c3) values(?,?,?)"
 
-	seqId, err := ExecInsertGetLastId(strSql)
+	err := ExecNoQuery(strSql, "aaaaa", "bbbbb", "ccccc")
 	if err != nil {
 		t.Error(err)
 	} else {
-		t.Log("执行成功,seqId:", seqId)
+		t.Log("执行成功")
 	}
 
 }
 
 func _Test_ExecQuery(t *testing.T) {
-	//Init()
-	//	strSql := fmt.Sprintf(`select seqid,accountid,userid,financeid,
-	//		fixedfee,baseunit,exceedrate,updatetime,updateuser
-	//		from T_NewBilling_UserAccount
-	//		`)
+	Init()
+	strSql := fmt.Sprintf(`select seqid,c1,c2,c3
+			from tbl_test
+			`)
 
-	//	p := []WordBook{}
-	//	err := ExecQuery(&p, strSql)
-	//	if err != nil {
-	//		t.Error(err)
-	//	} else {
-	//		t.Log("执行成功")
-	//		t.Log(len(p))
-	//		for _, u := range p {
-	//			t.Logf("%s,%s,%s", u.AccountId, u.UserId, u.FinanceId)
-	//			t.Log(u.UpdateTime)
-	//		}
-	//	}
+	p := []WordBook{}
+	err := ExecQuery(&p, strSql)
+	if err != nil {
+		t.Error(err)
+	} else {
+		t.Log("执行成功")
+		t.Log(len(p))
+		for _, u := range p {
+			t.Logf("%s,%s,%s", u.C1, u.C2, u.C3)
+		}
+	}
 }
 
 type WordBook struct {
-	SeqId        int64     `db:"seqid"`
-	Types        string    `db:"types"`
-	Table_fields []byte    `db:"table_fields"`
-	Pptr         []byte    `db:"pptr"`
-	Code         []byte    `db:"code"`
-	Text         []byte    `db:"text"`
-	Remark       []byte    `db:"remark"`
-	IsSystem     bool      `db:"issystem"`
-	UpdateTime   time.Time `db:"updatetime"`
-	UpdateUser   []byte    `db:"updateuser"`
+	SeqId int64  `db:"seqid"`
+	C1    string `db:"c1"`
+	C2    string `db:"c2"`
+	C3    string `db:"c3"`
 }
 
-func _Test_ExecInsertGetLastId(t *testing.T) {
-	strSql := fmt.Sprintf(`select  *
-		from T_NewBilling_UserAccount
-		where seqId=%s`, "2")
-	if exist, err := ExecCheckExists(strSql); err == nil {
-		t.Log(exist)
+func Test_ExecInsertGetLastId(t *testing.T) {
+	Init()
+	strSql := fmt.Sprintf(`insert into tbl_test(c1,c2,c3) values(?,?,?)`)
+	if seqId, err := ExecInsertGetLastId(strSql, "aaa2", "bbb2", "ccc2"); err == nil {
+		t.Log(seqId)
 	} else {
 		t.Log(err)
 	}
 }
 
+func Test_CheckExist(t *testing.T) {
+	Init()
+	strSql := `select seqid from tbl_test where seqid=?`
+	if exist, err := ExecCheckExists(strSql, 1); err == nil {
+		if exist {
+			t.Log("exist")
+		} else {
+			t.Log("not exist")
+		}
+	} else {
+		t.Error(err)
+	}
+}
+
+type UserInfo struct {
+	RowNum   int64  `db:"rownumber"`
+	Seqid    int64  `db:"seqid"`
+	DocId    string `db:"doc_id"`
+	DocTitle string `db:"doc_h1_text"`
+	DocGroup string `db:"doc_group"`
+}
+
 func Test_Paging(t *testing.T) {
 	Init()
 
-	var table string = "T_UserInfo"
-	var fields string = `T_UserInfo.seqid,
-	isnull(T_UserInfo.userid,'') as userid,
-	isnull(T_UserInfo.username,'') as username,
-	isnull(T_UserInfo.mobile,'') as mobile,
-	isnull(T_UserInfo.usertype,0) as usertype,
-	isnull(T_UserInfoExt.userappid,'') as userappid`
+	var table string = "doc_base as t"
+	var fields string = `t.seqid,
+	isnull(t.doc_id,'') as doc_id,
+	isnull(t.doc_h1_text,'') as doc_h1_text,
+	isnull(t.doc_group,'') as doc_group`
 	//	T_UserInfo.isCharge,
 	//	T_UserInfo.regTime,
-	var join string = `left join T_UserInfoExt on T_UserInfoExt.userid = T_UserInfo.userid`
-	var where string = `T_UserInfo.regTime > '2017-8-1'`
-	var strOrder string = `T_UserInfoExt.userAppId asc,T_UserInfo.seqId asc`
+	var join string = ``
+	var where string = ``
+	var strOrder string = `t.seqId asc`
 	var pageSize int = 100
-	var pageIndex int = 2
+	var pageIndex int = 1
 	var totalcount, pagecount, outPageIndex int
-	result := []UserInfo1{}
+	result := []UserInfo{}
 	var err error
 	totalcount, pagecount, outPageIndex, err = QueryByPage(&result, table, fields, where, strOrder, join, pageSize, pageIndex)
 	if err != nil {
 		t.Error(err)
 	} else {
+		// for i := range result {
+		// 	t.Log(result[i])
+		// }
 		t.Logf("totalcount:%d,pagecount:%d,outpageIndex:%d", totalcount, pagecount, outPageIndex)
-		//t.Log(result)
-		//j, err := json.Marshal(result)
-		if err != nil {
-			t.Error(err)
-		} else {
-			//	t.Log(string(j))
-		}
+
 	}
-}
-
-type UserInfo1 struct {
-	SeqId     int64  `db:"seqid"`
-	UserId    string `db:"userid"`
-	UserName  string `db:"username"`
-	Mobile    string `db:"mobile"`
-	UserAppId string `db:"userappid"`
-	UserType  string `db:"usertype"`
-	Rownumber int64  `db:"rownumber"`
-}
-
-type Call struct {
-	SeqId        int64  `db:"seqid"`
-	SessionId    string `db:"sessionid"`
-	CallItemId   string `db:"callitemid"`
-	MemberMobile string `db:"membermobile"`
-	ShowCaller   string `db:"showcaller"`
-	AccountId    string `db:"accountid"`
-	BillingUnit  int    `db:"billingunit"`
 }
